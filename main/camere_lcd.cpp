@@ -30,44 +30,48 @@
 
 #if CONFIG_USE_LCD
 CEspLcd* tft = NULL;
-#endif
 
-SemaphoreHandle_t camera_sem;
+typedef struct {
+    uint8_t frame_num;
+} camera_evt_t;
+
+QueueHandle_t camera_queue = NULL;
 static const char* TAG = "ESP-CAM-LCD";
 
-void take_camera_sem()
+void queue_send(uint8_t frame_num)
 {
-    xSemaphoreTake(camera_sem, portMAX_DELAY);
+    camera_evt_t camera_event;
+    camera_event.frame_num = frame_num;
+    xQueueSend(camera_queue, &camera_event, portMAX_DELAY);
 }
 
-void give_camera_sem()
+uint8_t queue_receive()
 {
-    xSemaphoreGive(camera_sem);
+    camera_evt_t camera_event;
+    xQueueReceive(camera_queue, &camera_event, portMAX_DELAY);
+    return camera_event.frame_num;
 }
 
 void app_lcd_task(void *pvParameters)
 {
-#if CONFIG_USE_LCD
     uint8_t i = 0;
     uint32_t time = 0;
+    camera_evt_t camera_event;
     time = xTaskGetTickCount();
     while(1) {
         if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
-            ESP_LOGI(TAG,"camera movie %d  fps\n", i);
+            ESP_LOGI(TAG,"camera movie %d  fps", i);
             time = xTaskGetTickCount();
             i = 0;
         }
-        xSemaphoreTake(camera_sem, portMAX_DELAY);
-        tft->drawBitmapafterconvert(0, 0, camera_get_fb(), camera_get_fb_width(), camera_get_fb_height());
-        xSemaphoreGive(camera_sem);
+        xQueueReceive(camera_queue, &camera_event, portMAX_DELAY);
+        tft->drawBitmapafterconvert(0, 0, camera_get_fb(camera_event.frame_num), camera_get_fb_width(), camera_get_fb_height());
         i++;
     }
-#endif
 }
 
 void app_lcd_init()
 {
-#if CONFIG_USE_LCD
     lcd_conf_t lcd_pins = {
         .lcd_model = LCD_MOD_ST7789,  //LCD_MOD_ILI9341,//LCD_MOD_ST7789,
         .pin_num_miso = CONFIG_HW_LCD_MISO_GPIO,
@@ -85,8 +89,7 @@ void app_lcd_init()
     /*Initialize SPI Handler*/
     if (tft == NULL) {
         tft = new CEspLcd(&lcd_pins);
-        camera_sem = xSemaphoreCreateBinary();
-        xSemaphoreGive(camera_sem);     //after initialize semaphoreGive is NULL
+        camera_queue = xQueueCreate(CAMERA_CACHE_NUM, sizeof(camera_evt_t));
     }
 
     /*screen initialize*/
@@ -94,5 +97,7 @@ void app_lcd_init()
     tft->setRotation(3);
     tft->fillScreen(COLOR_GREEN);
     tft->drawBitmap(0, 0, esp_logo, 137, 26);
-#endif
+    tft->drawString("Status: Initialize camera...", 5, 30);
+    tft->drawString("Status: Wifi Connecting...", 5, 44);
 }
+#endif

@@ -23,6 +23,9 @@
 extern "C" {
 #endif
 
+/* define camera cache photo page num */
+#define CAMERA_CACHE_NUM 10
+
 typedef enum {
     CAMERA_PF_RGB565 = 0,       //!< RGB, 2 bytes per pixel
     CAMERA_PF_YUV422 = 1,       //!< YUYV, 2 bytes per pixel
@@ -77,7 +80,7 @@ typedef struct {
     int jpeg_quality;
     bool test_pattern_enabled;
 
-    uint32_t* displayBuffer;
+    uint32_t ** displayBuffer;      //change uint32_t * to uint32_t **
 
 
 } camera_config_t;
@@ -121,7 +124,7 @@ esp_err_t camera_init(const camera_config_t* config);
  * @return pointer to framebuffer
  */
 //uint8_t* camera_get_fb();
-uint32_t* camera_get_fb();
+uint32_t* camera_get_fb(uint8_t i);
 
 /**
  * @brief Return the size of valid data in the framebuffer
@@ -153,7 +156,7 @@ int camera_get_fb_height();
  *
  * @return ESP_OK on success
  */
-esp_err_t camera_run();
+size_t camera_run();
 
 /**
  * @brief Print contents of framebuffer on terminal

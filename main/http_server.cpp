@@ -86,11 +86,10 @@ void convert_fb32bit_line_to_bmp565(uint32_t *srcline, uint8_t *destline,
         sptr = (uint16_t *) &destline[current_dest_pos + 2];
         *sptr = pixel565_2;
         current_dest_pos += 4;
-
     }
 }
 
-void http_server_netconn_serve(struct netconn *conn)
+void http_server_netconn_serve(struct netconn *conn, uint8_t frame_num)
 {
     struct netbuf *inbuf;
     char *buf;
@@ -120,7 +119,7 @@ void http_server_netconn_serve(struct netconn *conn)
                     || (CAMERA_PIXEL_FORMAT == CAMERA_PF_YUV422)) {
                 uint8_t s_line[camera_get_fb_width() * 2]; //camera_get_fb_width()
                 uint32_t *fbl;
-                uint32_t *currFbPtr = camera_get_fb();
+                uint32_t *currFbPtr = camera_get_fb(frame_num);
                 for (int i = 0; i < camera_get_fb_height(); i++) { //camera_get_fb_height()
                     fbl = (uint32_t *) &currFbPtr[(i * camera_get_fb_width()) / 2]; //(i*(320*2)/4); // 4 bytes for each 2 pixel / 2 byte read..
                     convert_fb32bit_line_to_bmp565(fbl, s_line, CAMERA_PIXEL_FORMAT);
@@ -128,7 +127,7 @@ void http_server_netconn_serve(struct netconn *conn)
                 }
                 ESP_LOGD(TAG, "Image sending Done ...");
             } else {
-                err = netconn_write(conn, camera_get_fb(), camera_get_data_size(), NETCONN_NOCOPY);
+                err = netconn_write(conn, camera_get_fb(0), camera_get_data_size(), NETCONN_NOCOPY);
             }
 
         }  // end GET request:
@@ -148,20 +147,11 @@ void http_server_task(void *pvParameters)
     do {
         ESP_LOGI(TAG, "netconn_accept start :%d\n", xTaskGetTickCount());
         err = netconn_accept(conn, &newconn);
-        ESP_LOGI(TAG, "netconn_accept stop :%d\n", xTaskGetTickCount());
         if (err == ERR_OK) { /* new conn is coming */
-            printf("camera_run start :%d\n", xTaskGetTickCount());
 
-            take_camera_sem();
-            ESP_LOGI(TAG, "http_server->xSemaphoreTake:::%d\n", i);
-            ert = camera_run();
-            printf("%s\n",
-                    ert == ERR_OK ? "camer run success" : "camera run failed");
-
-            http_server_netconn_serve(newconn);
+            http_server_netconn_serve(newconn, queue_receive());
 
             ESP_LOGI(TAG, "http_server->xSemaphoreGive:::%d\n", i++);
-            give_camera_sem();
 
             netconn_delete(newconn);
         }

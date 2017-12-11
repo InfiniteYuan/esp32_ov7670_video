@@ -48,17 +48,19 @@
 #define CAMERA_FRAME_SIZE CAMERA_FS_QVGA
 
 /**
- * @breif call xSemaphoreTake to take camera_sem
+ * @breif call xSemaphoreTake to receive camera frame number
  */
-void take_camera_sem();
+uint8_t queue_receive();
 
 /**
- * @breif call xSemaphoreGive to give camera_sem
+ * @breif call xSemaphoreGive to send camera frame number
  */
-void give_camera_sem();
+void queue_send(uint8_t frame_num);
 
 void app_lcd_init(void);
+
 void app_lcd_task(void *pvParameters);
+
 void http_server_task(void *pvParameters);
 
 #endif

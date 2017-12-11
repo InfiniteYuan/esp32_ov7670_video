@@ -54,41 +54,16 @@ void app_camera_init()
     config.xclk_freq_hz = CONFIG_XCLK_FREQ;
 
     //Warning: This gets squeezed into IRAM.
-    volatile static uint32_t *currFbPtr __attribute__ ((aligned(4))) = NULL;
-    volatile static uint32_t *currFbPtr1 __attribute__ ((aligned(4))) = NULL;
-    volatile static uint32_t *currFbPtr2 __attribute__ ((aligned(4))) = NULL;
-    volatile static uint32_t *currFbPtr3 __attribute__ ((aligned(4))) = NULL;
-    volatile static uint32_t *currFbPtr4 __attribute__ ((aligned(4))) = NULL;
-    volatile static uint32_t *currFbPtr5 __attribute__ ((aligned(4))) = NULL;
-    volatile static uint32_t *currFbPtr6 __attribute__ ((aligned(4))) = NULL;
-    volatile static uint32_t *currFbPtr7 __attribute__ ((aligned(4))) = NULL;
-    volatile static uint32_t *currFbPtr8 __attribute__ ((aligned(4))) = NULL;
-    ESP_LOGI(TAG, "get free size of 32BIT heap : %d\n",
-            heap_caps_get_free_size(MALLOC_CAP_32BIT));
-    currFbPtr = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr1 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr2 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr3 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr4 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr5 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr6 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr7 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr8 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr8 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr8 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr8 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
-    currFbPtr8 = (volatile uint32_t*) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
+    volatile static uint32_t * * currFbPtr __attribute__ ((aligned(4))) = NULL;
+    currFbPtr= (volatile uint32_t **)malloc(sizeof(uint32_t *) * CAMERA_CACHE_NUM);
 
-    ESP_LOGI(TAG, "%s\n", currFbPtr == NULL ? "currFbPtr is NULL" : "currFbPtr not NULL");
-    ESP_LOGI(TAG, "%s\n", currFbPtr1 == NULL ? "currFbPtr1 is NULL" : "currFbPtr1 not NULL");
-    ESP_LOGI(TAG, "%s\n", currFbPtr2 == NULL ? "currFbPtr2 is NULL" : "currFbPtr2 not NULL");
-    ESP_LOGI(TAG, "%s\n", currFbPtr3 == NULL ? "currFbPtr3 is NULL" : "currFbPtr3 not NULL");
-    ESP_LOGI(TAG, "%s\n", currFbPtr4 == NULL ? "currFbPtr4 is NULL" : "currFbPtr4 not NULL");
-    ESP_LOGI(TAG, "%s\n", currFbPtr5 == NULL ? "currFbPtr5 is NULL" : "currFbPtr5 not NULL");
-    ESP_LOGI(TAG, "%s\n", currFbPtr6 == NULL ? "currFbPtr6 is NULL" : "currFbPtr6 not NULL");
-    ESP_LOGI(TAG, "%s\n", currFbPtr7 == NULL ? "currFbPtr7 is NULL" : "currFbPtr7 not NULL");
-    ESP_LOGI(TAG, "%s\n", currFbPtr8 == NULL ? "currFbPtr8 is NULL" : "currFbPtr8 not NULL");
-    ESP_LOGI(TAG, "framebuffer address is:%p\n", currFbPtr);
+    ESP_LOGI(TAG, "get free size of 32BIT heap : %d\n", heap_caps_get_free_size(MALLOC_CAP_32BIT));
+
+    for(int i = 0; i < CAMERA_CACHE_NUM; i++)
+        currFbPtr[i] = (volatile uint32_t *) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
+
+    ESP_LOGI(TAG, "%s\n", currFbPtr[0] == NULL ? "currFbPtr is NULL" : "currFbPtr not NULL");
+    ESP_LOGI(TAG, "framebuffer address is:%p\n", currFbPtr[0]);
 
     // camera init
     esp_err_t err = camera_probe(&config, &camera_model);
@@ -104,7 +79,7 @@ void app_camera_init()
         ESP_LOGI(TAG, "Cant detected ov7670 camera");
     }
 
-    config.displayBuffer = (uint32_t*) currFbPtr;
+    config.displayBuffer = (uint32_t**) currFbPtr;
     config.pixel_format = CAMERA_PIXEL_FORMAT;
 
     err = camera_init(&config);
@@ -117,27 +92,27 @@ void app_camera_init()
 static void app_camera_task(void *pvParameters)
 {
     uint32_t i = 0;
-//    uint32_t time = 0;
+    uint8_t frame_num = 0;
+    uint32_t time = 0;
     while (1) {
-//        if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
-//            ESP_LOGI(TAG,"camera movie %d  fps\n", i);
-//            time = xTaskGetTickCount();
-//            i = 0;
-//        }
-        ESP_LOGI(TAG, "start camera_task->xSemaphoreTake:::%d\n", i);
-        take_camera_sem();
-        if (camera_run() == ESP_OK) {
-            ESP_LOGI(TAG, "camera_task->camera_run ok :::%d\n", i);
+        if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
+            ESP_LOGI(TAG,"camera movie %d fps", i);
+            time = xTaskGetTickCount();
+            i = 0;
         }
-        ESP_LOGI(TAG, "camera_task->xSemaphoreGive:::%d\n", i++);
-        give_camera_sem();
+        if ((frame_num = camera_run()) != ESP_FAIL) {
+            queue_send(frame_num % CAMERA_CACHE_NUM);
+        }
+        ESP_LOGI(TAG, "camera_task->xQueueSend ::: %d", i++);
     }
 }
 
 extern "C" void app_main()
 {
     app_camera_init();
+#if CONFIG_USE_LCD
     app_lcd_init();
+#endif
 
     CWiFi *my_wifi = CWiFi::GetInstance(WIFI_MODE_STA);
     printf("connect wifi\n");
@@ -150,8 +125,10 @@ extern "C" void app_main()
     ESP_LOGD(TAG, "Starting http_server task...");
     xTaskCreatePinnedToCore(&http_server_task, "http_server_task", 4096, NULL, 5, NULL, 1);
 
+#if CONFIG_USE_LCD
     ESP_LOGD(TAG, "Starting app_lcd_task...");
-    xTaskCreatePinnedToCore(&app_lcd_task, "app_lcd_task", 4096, NULL, 3, NULL, 1);
+    xTaskCreate(&app_lcd_task, "app_lcd_task", 4096, NULL, 3, NULL);
+#endif
 
     ESP_LOGD(TAG, "Starting app_camera_task...");
     xTaskCreate(&app_camera_task, "app_camera_task", 4096, NULL, 3, NULL);

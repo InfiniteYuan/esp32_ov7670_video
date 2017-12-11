@@ -44,6 +44,7 @@
 #include "ov7670.h"
 #endif
 
+#define _NDEBUG
 //#define ENABLE_TEST_PATTERN CONFIG_ENABLE_TEST_PATTERN
 
 #define REG_PID        0x0A
@@ -338,7 +339,7 @@ esp_err_t camera_init(const camera_config_t* config)
         err = ESP_ERR_NO_MEM;
         goto fail;
       }
-      s_state->fb = (uint32_t*)config->displayBuffer; //(uint8_t*) calloc(max_fb_size, 1);
+      s_state->fb = (uint32_t **)config->displayBuffer; //(uint8_t*) calloc(max_fb_size, 1);
       ESP_LOGD(TAG, "Allocated frame buffer (%d bytes)", max_fb_size);
     }
     if (s_state->fb == NULL) {
@@ -413,12 +414,12 @@ fail:
     return err;
 }
 
-uint32_t* camera_get_fb()
+uint32_t* camera_get_fb(uint8_t i)
 {
     if (s_state == NULL) {
         return NULL;
     }
-    return s_state->fb;
+    return s_state->fb[i];
 }
 
 int camera_get_fb_width()
@@ -445,11 +446,10 @@ size_t camera_get_data_size()
     return s_state->data_size;
 }
 
-
-esp_err_t camera_run()
+size_t camera_run()
 {
     if (s_state == NULL) {
-        return ESP_ERR_INVALID_STATE;
+        return ESP_FAIL;
     }
     struct timeval tv_start;
     gettimeofday(&tv_start, NULL);
@@ -469,10 +469,10 @@ esp_err_t camera_run()
 //    char frame_info_str[40]; //
 //    print_frame_data(frame_info_str);
 //    ESP_LOGI(TAG, "Frame format %s : %d done in %d ms", frame_info_str, s_state->frame_count, time_ms);
-    ESP_LOGI(TAG, "Frame %d done in %d ms", s_state->frame_count, time_ms);
+    ESP_LOGD(TAG, "Frame %d done in %d ms", s_state->frame_count, time_ms);
 
     s_state->frame_count++;
-    return ESP_OK;
+    return s_state->frame_count - 1;
 }
 
 static esp_err_t dma_desc_init()
@@ -744,21 +744,20 @@ static size_t get_fb_pos()
             s_state->fb_bytes_per_pixel / s_state->dma_per_line;
 }
 
-
-
 static void IRAM_ATTR dma_filter_task(void *pvParameters)
 {
+    static uint8_t i = 0;
     while (true) {
         size_t buf_idx;
         xQueueReceive(s_state->data_ready, &buf_idx, portMAX_DELAY);
         if (buf_idx == SIZE_MAX) {
+            i = (i + 1) % CAMERA_CACHE_NUM;
             s_state->data_size = get_fb_pos();
             xSemaphoreGive(s_state->frame_ready);
             continue;
         }
 
-        //uint8_t* pfb = s_state->fb + get_fb_pos();
-        uint32_t* pfb = s_state->fb + get_fb_pos()/4;
+        uint32_t* pfb = s_state->fb[i] + get_fb_pos()/4;
         const dma_elem_t* buf = s_state->dma_buf[buf_idx];
         lldesc_t* desc = &s_state->dma_desc[buf_idx];
         ESP_LOGV(TAG, "dma_flt: pos=%d ", get_fb_pos()/4);
