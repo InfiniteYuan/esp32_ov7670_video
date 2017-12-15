@@ -88,7 +88,6 @@ static void dma_filter_raw(const dma_elem_t* src, lldesc_t* dma_desc, uint32_t* 
 
 static void i2s_stop();
 
-
 static bool is_hs_mode()
 {
     return s_state->config.xclk_freq_hz > 10000000;
@@ -328,7 +327,6 @@ esp_err_t camera_init(const camera_config_t* config)
         goto fail;
     }
 
-
     ESP_LOGD(TAG, "Frame buffer (%d bytes)", s_state->fb_size);
     if (s_state->fb == NULL) {
       ESP_LOGD(TAG, "Using 32-bit aligned ram shared with display - 320x240x2bpp");
@@ -459,7 +457,7 @@ size_t camera_run()
     i2s_run();
 
     // set
-    ESP_LOGD(TAG, "Waiting for frame");
+//    ESP_LOGD(TAG, "Waiting for frame");
 
     xSemaphoreTake(s_state->frame_ready, portMAX_DELAY);
     struct timeval tv_end;
@@ -469,7 +467,7 @@ size_t camera_run()
 //    char frame_info_str[40]; //
 //    print_frame_data(frame_info_str);
 //    ESP_LOGI(TAG, "Frame format %s : %d done in %d ms", frame_info_str, s_state->frame_count, time_ms);
-    ESP_LOGD(TAG, "Frame %d done in %d ms", s_state->frame_count, time_ms);
+//    ESP_LOGD(TAG, "Frame %d done in %d ms", s_state->frame_count, time_ms);
 
     s_state->frame_count++;
     return s_state->frame_count - 1;
@@ -661,14 +659,14 @@ static void i2s_run()
 #endif
 
     // wait for vsync
-    ESP_LOGD(TAG, "Waiting for positive edge on VSYNC");
+//    ESP_LOGD(TAG, "Waiting for positive edge on VSYNC");
     while (gpio_get_level(s_state->config.pin_vsync) == 0) {
         ;
     }
     while (gpio_get_level(s_state->config.pin_vsync) != 0) {
         ;
     }
-    ESP_LOGD(TAG, "Got VSYNC");
+//    ESP_LOGD(TAG, "Got VSYNC");
 
     //init DMA and intr
     s_state->dma_done = false;
@@ -691,7 +689,6 @@ static void i2s_run()
     }
 
     I2S0.conf.rx_start = 1;
-
 }
 
 static void IRAM_ATTR signal_dma_buf_received(bool* need_yield)
@@ -766,7 +763,6 @@ static void IRAM_ATTR dma_filter_task(void *pvParameters)
         ESP_LOGV(TAG, "dma_flt: flt_count=%d ", s_state->dma_filtered_count);
     }
 }
-
 
 inline uint32_t pack(uint8_t byte0, uint8_t byte1, uint8_t byte2, uint8_t byte3) {
     long result;

@@ -738,7 +738,7 @@ static int reset(sensor_t *sensor)
     systick_sleep(10);
 
     // Write default regsiters
-    for (i=0, regs = default_regs; regs[i][0]; i++) {
+    for (i=0, regs = default_regs; regs[i][0] != 0xff; i++) {
         SCCB_Write(sensor->slv_addr, regs[i][0], regs[i][1]);
     }
 

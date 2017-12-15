@@ -59,8 +59,10 @@ void app_camera_init()
 
     ESP_LOGI(TAG, "get free size of 32BIT heap : %d\n", heap_caps_get_free_size(MALLOC_CAP_32BIT));
 
-    for(int i = 0; i < CAMERA_CACHE_NUM; i++)
+    for(int i = 0; i < CAMERA_CACHE_NUM; i++){
         currFbPtr[i] = (volatile uint32_t *) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
+        ESP_LOGI(TAG, "framebuffer address is:%p\n", currFbPtr[i]);
+    }
 
     ESP_LOGI(TAG, "%s\n", currFbPtr[0] == NULL ? "currFbPtr is NULL" : "currFbPtr not NULL");
     ESP_LOGI(TAG, "framebuffer address is:%p\n", currFbPtr[0]);
@@ -81,6 +83,7 @@ void app_camera_init()
 
     config.displayBuffer = (uint32_t**) currFbPtr;
     config.pixel_format = CAMERA_PIXEL_FORMAT;
+//    config.test_pattern_enabled = CONFIG_ENABLE_TEST_PATTERN;
 
     err = camera_init(&config);
     if (err != ESP_OK) {
@@ -94,16 +97,18 @@ static void app_camera_task(void *pvParameters)
     uint32_t i = 0;
     uint8_t frame_num = 0;
     uint32_t time = 0;
+    time = xTaskGetTickCount();
     while (1) {
-        if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
-            ESP_LOGI(TAG,"camera movie %d fps", i);
-            time = xTaskGetTickCount();
-            i = 0;
-        }
+//        queue_send(i%CAMERA_CACHE_NUM);
+//        if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
+//            ESP_LOGI(TAG,"app_camera_task movie %d fps", i);
+//            time = xTaskGetTickCount();
+//            i = 0;
+//        }
+//        i++;
         if ((frame_num = camera_run()) != ESP_FAIL) {
             queue_send(frame_num % CAMERA_CACHE_NUM);
         }
-        ESP_LOGI(TAG, "camera_task->xQueueSend ::: %d", i++);
     }
 }
 
@@ -122,12 +127,12 @@ extern "C" void app_main()
     vTaskDelay(500 / portTICK_RATE_MS);
     ESP_LOGI(TAG, "Free heap: %u", xPortGetFreeHeapSize());
 
-    ESP_LOGD(TAG, "Starting http_server task...");
-    xTaskCreatePinnedToCore(&http_server_task, "http_server_task", 4096, NULL, 5, NULL, 1);
+//    ESP_LOGD(TAG, "Starting http_server task...");
+//    xTaskCreatePinnedToCore(&http_server_task, "http_server_task", 4096, NULL, 5, NULL, 1);
 
 #if CONFIG_USE_LCD
     ESP_LOGD(TAG, "Starting app_lcd_task...");
-    xTaskCreate(&app_lcd_task, "app_lcd_task", 4096, NULL, 3, NULL);
+    xTaskCreate(&app_lcd_task, "app_lcd_task", 4096, NULL, 4, NULL);
 #endif
 
     ESP_LOGD(TAG, "Starting app_camera_task...");

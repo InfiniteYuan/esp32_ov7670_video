@@ -12,8 +12,8 @@
 #define GAIN                    0x00 /* AGC – Gain control gain setting  */
 #define BLUE                    0x01 /* AWB – Blue channel gain setting  */
 #define RED                     0x02 /* AWB – Red channel gain setting   */
-#define VREF                    0x03 /* AWB – Green channel gain setting */
-#define COM1			0x04 /* Common Control 1 */
+#define VREF                    0x03 /* Pieces of GAIN, VSTART, VSTOP */
+#define COM1                    0x04 /* Common Control 1 */
 #define BAVG                    0x05 /* U/B Average Level   */
 #define GAVG                    0x06 /* Y/Gb Average Level  */
 #define AECH                    0x07 /* Exposure VAlue - AEC MSB 5 bits  */
@@ -26,8 +26,8 @@
 #define COM2_OUT_DRIVE_3x       0x02 /* Output drive capability 3x */
 #define COM2_OUT_DRIVE_4x       0x03 /* Output drive capability 4x */
 
-#define REG_PID                     0x0A /* Product ID Number MSB */
-#define REG_VER                     0x0B /* Product ID Number LSB */
+#define REG_PID                 0x0A /* Product ID Number MSB */
+#define REG_VER                 0x0B /* Product ID Number LSB */
 
 #define COM3                    0x0C /* Common Control 3 				        */
 #define COM3_VFLIP              0x80 /* Vertical flip image ON/OFF selection                    */
@@ -131,24 +131,24 @@
 #define VSTART                  0x19  /* Vertical Frame (row) Start high 8-bit (low 2 bits are at VREF[1:0]) */
 #define VSTOP                   0x1A  /* Vertical Frame (row) End high 8-bit (low 2 bits are at VREF[3:2]) */
 #define PSHFT                   0x1B  /* Data Format - Pixel Delay Select */
-#define REG_MIDH                    0x1C  /* Manufacturer ID Byte – High */
-#define REG_MIDL                    0x1D  /* Manufacturer ID Byte – Low */
-#define MVFP			0x3E  /* Mirror/Vflip Enable */
+#define REG_MIDH                0x1C  /* Manufacturer ID Byte – High */
+#define REG_MIDL                0x1D  /* Manufacturer ID Byte – Low */
+#define MVFP			        0x3E  /* Mirror/Vflip Enable */
 #define MVFP_SET_MIRROR(r,x)	((r&0xDF)|((x&1)<<5)) /* change only bit5 according to x */
-#define MVFP_SET_FLIP(r,x)	((r&0xEF)|((x&1)<<4)) /* change only bit4 according to x */
+#define MVFP_SET_FLIP(r,x)	    ((r&0xEF)|((x&1)<<4)) /* change only bit4 according to x */
 #define LAEC                    0x1F  /* Fine AEC Value - defines exposure value less than one row period (Reserved?) */
 
 
 #define ADCCTR0                 0x20 /* ADC control */
 /*#define COM11_SNGL_FRAME_EN     0x02  Single frame ON/OFF selection
 #define COM11_SNGL_XFR_TRIG     0x01  Single frame transfer trigger */
-#define ADCCTR1			0x21 /* reserved */
+#define ADCCTR1			        0x21 /* reserved */
 #define ADCCTR2                 0x22 /* reserved */
 #define ADCCTR3                 0x23 /* reserved */
 #define AEW                     0x24 /* AGC/AEC - Stable Operating Region (Upper Limit) */
 #define AEB                     0x25 /* AGC/AEC - Stable Operating Region (Lower Limit) */
 #define VPT                     0x26 /* AGC/AEC Fast Mode Operating Region */
-#define BBIAS 			0x27 /* B channel signal output bias (effective only when COM6[3]=1) */
+#define BBIAS 			        0x27 /* B channel signal output bias (effective only when COM6[3]=1) */
 #define GbBIAS                  0x28 /* Gb channel signal output bias (effective only when COM6[3]=1) */
 //#define HOUTSIZE                0x29 /* reserved */
 #define EXHCH                   0x2A /* Dummy Pixel Insert MSB */
@@ -169,8 +169,8 @@
 #define OFON                    0x39 /* ADC offset control */
 #define TSLB                    0x3A /* Line buffer test option  */
 #define COM11                   0x3B /* Common control 11 */
-#define COM11_EXP		0x02
-#define COM11_HZAUTO		0x10	/* Auto detect 50/60 Hz */
+#define COM11_EXP		        0x02
+#define COM11_HZAUTO		    0x10	/* Auto detect 50/60 Hz */
 #define COM12                   0x3C /* Common control 12 */
 #define COM13                   0x3D /* Common control 13 */
 
@@ -184,7 +184,7 @@
 #define COM15                   0x40 /* Common Control 15 DIFFERENT CONTROLS */
 #define COM15_SET_RGB565(r,x)	((r&0xEF)|((x&1)<<4)) /* set rgb565 mode */
 #define COM16                   0x41 /* Common Control 16 DIFFERENT CONTROLS */
-#define COM16_AWBGAIN		0x08	/* AWB gain enable */
+#define COM16_AWBGAIN		    0x08	/* AWB gain enable */
 #define COM17                   0x42 /* Common Control 17   */
 //#define TGT_R                   0x43 /* BLC Red Channel Target Value    */
 //#define TGT_GB                  0x44 /* BLC Gb Channel Target Value     */
@@ -200,7 +200,7 @@
 //#define LC_COEF                 0x49 /* Lens Correction Coefficient */
 //#define LC_RADI                 0x4A /* Lens Correction Radius */
 #define REG4B                   0x4B /* Register 4B */
-#define DNSTH                  0x4C /* Denoise strength */
+#define DNSTH                   0x4C /* Denoise strength */
 
 //#define FIXGAIN                 0x4D /* Analog Fix Gain Amplifier */
 //#define AREF0                   0x4E /* Sensor Reference Control */
@@ -211,17 +211,17 @@
 #define MTX5                    0x53 /* Matrix coefficient 5 */
 #define MTX6                    0x54 /* Matrix coefficient 6 */
 #define BRIGHTNESS              0x55 /* Brightness control */
-#define CONTRAST		0x56 /* Contrast control */
-#define CONTRASCENTER		0x57 /* Contrast center */
-#define MTXS			0x58 /* Matrix coefficient sign for coefficient 5 to 0*/
+#define CONTRAST		        0x56 /* Contrast control */
+#define CONTRASCENTER		    0x57 /* Contrast center */
+#define MTXS			        0x58 /* Matrix coefficient sign for coefficient 5 to 0*/
 //#define UFIX                    0x60 /* U Channel Fixed Value Output */
 //#define VFIX                    0x61 /* V Channel Fixed Value Output */
 #define LCC1                    0x62 /* Lens correction option 1  */
 
 #define LCC2                    0x63 /* Lens correction option 2 */
-#define LCC3 			0x64 /* Lens correction option 3 */
-#define LCC4			0x65 /* Lens correction option 4 */
-#define LCC5			0x66 /* Lens correction option 5 */
+#define LCC3 			        0x64 /* Lens correction option 3 */
+#define LCC4			        0x65 /* Lens correction option 4 */
+#define LCC5			        0x66 /* Lens correction option 5 */
 //#define AWB_CTRL0_GAIN_EN       0x80 /* AWB gain enable      */
 //#define AWB_CTRL0_CALC_EN       0x40 /* AWB calculate enable */
 //#define AWB_CTRL0_WBC_MASK      0x0F /* WBC threshold 2      */
@@ -260,7 +260,7 @@
 #define GFIX                    0x69 /* Fix gain control */
 #define GGAIN                   0x6A /* G channel AWB gain */
 
-#define DBLV               	0x6B /* PLL and clock ? */
+#define DBLV               	    0x6B /* PLL and clock ? */
 //#define AWB_CTRL3_ADVANCED      0x80 /* AWB mode select - Advanced AWB */
 //#define AWB_CTRL3_SIMPLE        0x00 /* AWB mode select - Simple AWB */
 // bis hier
@@ -269,7 +269,7 @@
 #define AWBCTR1                 0x6E /* AWB Control 1  */
 #define AWBCTR0                 0x6F /* AWB Control 0  */
 #define SCALING_XSC             0x70 /* test pattern and horizontal scaling factor */
-#define SCALING_XSC_CBAR(r)	(r&0x7F) /* make sure bit7 is 0 for color bar */
+#define SCALING_XSC_CBAR(r)	    (r&0x7F) /* make sure bit7 is 0 for color bar */
 #define SCALING_YSC             0x71 /* test pattern and vertical scaling factor */
 #define SCALING_YSC_CBAR(r,x)	((r&0x7F)|((x&1)<<7)) /* change bit7 for color bar on/off */
 #define SCALING_DCWCTR          0x72 /* DCW control */
@@ -318,7 +318,7 @@
 
 //#define BRIGHTNESS              0x9B /* Brightness Control */
 //#define CONTRAST                0x9C /* Contrast Gain */
-#define BD50ST			0x9D /* 50 Hz banding filter value */
+#define BD50ST			        0x9D /* 50 Hz banding filter value */
 #define BD60ST                  0x9E /* 60 Hz banding filter value */
 #define HAECC1                  0x9F /* Histogram-based AEC/AGC control 1 */
 #define HAECC2                  0xA0 /* Histogram-based AEC/AGC control 2 */
@@ -326,12 +326,12 @@
 #define SCALING_PCLK_DELAY      0xA2 /* Pixel clock delay */
 //#define FIFODLYM                0xA3 /* FIFO Manual Mode Delay Control */
 #define NT_CNTRL                0xA4 /*  */
-#define BD50MAX			0xA5 /* 50 Hz banding step limit */
+#define BD50MAX			        0xA5 /* 50 Hz banding step limit */
 #define HAECC3                  0xA6 /* Histogram-based AEC/AGC control 3  */
-#define HAECC4 	   	        0xA7 /* Histogram-based AEC/AGC control 4           */
-#define HAECC5		        0xA8 /* Histogram-based AEC/AGC control 5         */
-#define HAECC6		        0xA9 /* Histogram-based AEC/AGC control 6           */
-#define HAECC7		        0xAA /* Histogram-based AEC/AGC control 7           */
+#define HAECC4 	   	            0xA7 /* Histogram-based AEC/AGC control 4           */
+#define HAECC5		            0xA8 /* Histogram-based AEC/AGC control 5         */
+#define HAECC6		            0xA9 /* Histogram-based AEC/AGC control 6           */
+#define HAECC7		            0xAA /* Histogram-based AEC/AGC control 7           */
 //#define SDE_CONT_BRIGHT_EN      0x04 /* Contrast/Brightness enable      */
 //#define SDE_SATURATION_EN       0x02 /* Saturation enable               */
 //#define SDE_HUE_EN              0x01 /* Hue enable                      */
@@ -339,17 +339,17 @@
 #define BD60MAX                 0xAB /* 60 Hz banding step limit */
 
 #define STR_OPT                 0xAC /* Register AC */
-#define STR_R			0xAD /* R gain for led output frame */
-#define STR_G			0xAE /* G gain for led output frame */
-#define STR_B			0xAF /* B gain for led output frame */
-#define ABLC1			0xB1 /* */
-#define THL_ST			0xB3 /* ABLC target */
-#define THL_DLT			0xB5 /* ABLC stable range */
-#define AD_CHB			0xBE /* blue channel black level compensation */
-#define AD_CHR			0xBF /* Red channel black level compensation */
-#define AD_CHGb			0xC0 /* Gb channel black level compensation */
-#define AD_CHGr			0xC1 /* Gr channel black level compensation */
-#define SATCTR			0xC9 /* Saturation control */
+#define STR_R			        0xAD /* R gain for led output frame */
+#define STR_G			        0xAE /* G gain for led output frame */
+#define STR_B			        0xAF /* B gain for led output frame */
+#define ABLC1			        0xB1 /* */
+#define THL_ST			        0xB3 /* ABLC target */
+#define THL_DLT			        0xB5 /* ABLC stable range */
+#define AD_CHB			        0xBE /* blue channel black level compensation */
+#define AD_CHR			        0xBF /* Red channel black level compensation */
+#define AD_CHGb			        0xC0 /* Gb channel black level compensation */
+#define AD_CHGr			        0xC1 /* Gr channel black level compensation */
+#define SATCTR			        0xC9 /* Saturation control */
 //#define DSPAUTO_AWB_EN          0x80 /* AWB auto threshold control */
 //#define DSPAUTO_DENOISE_EN      0x40 /* De-noise auto threshold control */
 //#define DSPAUTO_EDGE_EN         0x20 /* Sharpness (edge enhancement) auto strength control */
@@ -372,14 +372,14 @@
 #define AWBC2	   	0x44
 #define AWBC2_VALUE	0xf0
 
-#define AWBC3	   	0x45
+#define AWBC3	   	    0x45
 #define AWBC3_VALUE  	0x34
 
 #define AWBC4	   	0x46
 #define AWBC4_VALUE	0x58
 
 #define AWBC5	        0x47
-#define AWBC5_VALUE	0x28
+#define AWBC5_VALUE	    0x28
 
 #define AWBC6	   	0x48
 #define AWBC6_VALUE	0x3a

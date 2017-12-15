@@ -21,6 +21,7 @@
   * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
   *
   */
+#include "../components/qrlib/include/quirc_internal.h"
 #include "lwip/api.h"
 #include "camera.h"
 #include "bitmap.h"
@@ -52,21 +53,90 @@ uint8_t queue_receive()
     return camera_event.frame_num;
 }
 
+uint8_t queue_available()
+{
+    return uxQueueSpacesAvailable(camera_queue);
+}
+
+void convert(unsigned char *img565, unsigned char *imgGray, int iWidth, int iHeight)
+{
+    uint16_t * pData565 ;
+    pData565 = (uint16_t *)img565;
+    int iIndex = 0;
+    for (int x = 0; x < iHeight; ++x)
+    {
+        for (int y = 0; y < iWidth; ++y)
+        {
+//            unsigned char chR = *(pData565 + iIndex) & RGB565_MASK_RED >> 11;
+//            unsigned char chG = *(pData565 + iIndex) & RGB565_MASK_GREEN >> 5;
+//            unsigned char chB = *(pData565 + iIndex) & RGB565_MASK_BLUE;
+            unsigned char chR = ((*(pData565 + iIndex) & RGB565_MASK_RED) >> 11 ) << 3;
+            unsigned char chG = ((*(pData565 + iIndex) & RGB565_MASK_GREEN) >> 5) << 2;
+            unsigned char chB = (*(pData565 + iIndex) & RGB565_MASK_BLUE) << 3 ;
+            unsigned char chGray = (chR*30 + chG*59 + chB*11 + 50) / 100;//(chB*0.3 +chR*0.11 +chG*0.59);
+            *(imgGray + x * iWidth + y) = chGray;
+            ++iIndex;
+        }
+    }
+}
+
+void qrdecode(uint8_t j)
+{
+    struct quirc *qr;
+    int num_codes;
+    int i;
+    uint8_t *image;
+    int w, h;
+
+    qr = quirc_new();
+    if (!qr) {
+        perror("Failed to allocate memory");
+        abort();
+    }
+
+    if (quirc_resize(qr, 320, 240) < 0) {
+        perror("Failed to allocate video memory");
+        abort();
+    }
+
+    image = quirc_begin(qr, &w, &h);
+    quirc_end(qr);
+//    convert((unsigned char *)camera_get_fb(j), image, 320, 240);
+//    num_codes = quirc_count(qr);
+//    for (i = 0; i < num_codes; i++) {
+//        struct quirc_code code;
+//        struct quirc_data data;
+//        quirc_decode_error_t err;
+//
+//        quirc_extract(qr, i, &code);
+//
+//        /* Decoding stage */
+//        err = quirc_decode(&code, &data);
+//        if (err)
+//            printf("DECODE FAILED: %s\n", quirc_strerror(err));
+//        else
+//            printf("Data: %s\n", data.payload);
+//    }
+}
+
 void app_lcd_task(void *pvParameters)
 {
     uint8_t i = 0;
     uint32_t time = 0;
     camera_evt_t camera_event;
+    camera_event.frame_num = 0;
     time = xTaskGetTickCount();
     while(1) {
+        xQueueReceive(camera_queue, &camera_event, portMAX_DELAY);
         if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
-            ESP_LOGI(TAG,"camera movie %d  fps", i);
+            ESP_LOGI(TAG,"app_lcd_task movie %d  fps", i);
             time = xTaskGetTickCount();
             i = 0;
         }
-        xQueueReceive(camera_queue, &camera_event, portMAX_DELAY);
-        tft->drawBitmapafterconvert(0, 0, camera_get_fb(camera_event.frame_num), camera_get_fb_width(), camera_get_fb_height());
         i++;
+//        time = xTaskGetTickCount();
+        tft->drawBitmap(0, 0, (uint16_t *)camera_get_fb(camera_event.frame_num), camera_get_fb_width(), camera_get_fb_height(), false);
+//        ESP_LOGI(TAG,"app_lcd_task use time %d  ms", (xTaskGetTickCount()-time) * portTICK_RATE_MS);
     }
 }
 
@@ -81,7 +151,7 @@ void app_lcd_init()
         .pin_num_dc = CONFIG_HW_LCD_DC_GPIO,
         .pin_num_rst = CONFIG_HW_LCD_RESET_GPIO,
         .pin_num_bckl = CONFIG_HW_LCD_BL_GPIO,
-        .clk_freq = 20 * 1000 * 1000,
+        .clk_freq = 40 * 1000 * 1000,
         .rst_active_level = 0,
         .bckl_active_level = 0,
         .spi_host = HSPI_HOST,};
@@ -89,7 +159,7 @@ void app_lcd_init()
     /*Initialize SPI Handler*/
     if (tft == NULL) {
         tft = new CEspLcd(&lcd_pins);
-        camera_queue = xQueueCreate(CAMERA_CACHE_NUM, sizeof(camera_evt_t));
+        camera_queue = xQueueCreate(CAMERA_CACHE_NUM - 1, sizeof(camera_evt_t));
     }
 
     /*screen initialize*/
@@ -97,7 +167,7 @@ void app_lcd_init()
     tft->setRotation(3);
     tft->fillScreen(COLOR_GREEN);
     tft->drawBitmap(0, 0, esp_logo, 137, 26);
-    tft->drawString("Status: Initialize camera...", 5, 30);
-    tft->drawString("Status: Wifi Connecting...", 5, 44);
+    tft->drawString("Status: Initialize camera ...", 5, 30);
+    tft->drawString("Status: Wifi Connecting ...", 5, 44);
 }
 #endif

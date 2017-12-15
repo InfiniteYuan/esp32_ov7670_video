@@ -24,7 +24,6 @@
 #ifndef _IOT_CAMERA_TASK_H_
 #define _IOT_CAMERA_TASK_H_
 
-
 #define WIFI_PASSWORD CONFIG_WIFI_PASSWORD
 #define WIFI_SSID     CONFIG_WIFI_SSID
 /**
@@ -47,6 +46,10 @@
  */
 #define CAMERA_FRAME_SIZE CAMERA_FS_QVGA
 
+#define RGB565_MASK_RED        0xF800
+#define RGB565_MASK_GREEN      0x07E0
+#define RGB565_MASK_BLUE       0x001F
+
 /**
  * @breif call xSemaphoreTake to receive camera frame number
  */
@@ -56,6 +59,8 @@ uint8_t queue_receive();
  * @breif call xSemaphoreGive to send camera frame number
  */
 void queue_send(uint8_t frame_num);
+
+uint8_t queue_available();
 
 void app_lcd_init(void);
 

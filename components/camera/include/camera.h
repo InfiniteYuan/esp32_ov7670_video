@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 /* define camera cache photo page num */
-#define CAMERA_CACHE_NUM 10
+#define CAMERA_CACHE_NUM 5
 
 typedef enum {
     CAMERA_PF_RGB565 = 0,       //!< RGB, 2 bytes per pixel
@@ -184,7 +184,6 @@ int cam_set_sensor_reg(uint8_t reg, uint8_t regVal);
 
 void set_test_modes(bool s_yuv_test_mode, bool s_yuv_reverse_bytes,
                     bool s_raw_bytes_only, bool s_gbr_rgb_order, int s_highspeed_sampling_mode, bool s_test_tft_filter);
-
 
 #ifdef __cplusplus
 }
