@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+#esp-iotsolution
+build/
+.settings
+.config
+*.o
+*.pyc
+*.d
+*.old
+*.cproject
