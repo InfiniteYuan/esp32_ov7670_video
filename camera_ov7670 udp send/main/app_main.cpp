@@ -132,7 +132,9 @@ extern "C" void app_main()
 //    ESP_LOGD(TAG, "Starting http_server task...");
 //    xTaskCreatePinnedToCore(&http_server_task, "http_server_task", 4096, NULL, 5, NULL, 1);
 
-    xTaskCreate(&tcp_client_obj_task, "tcp_client_obj_task", 4096, NULL, 4, NULL);
+//    xTaskCreate(&tcp_client_obj_task, "tcp_client_obj_task", 4096, NULL, 4, NULL);
+
+    xTaskCreate(&udp_client_task, "udp_client_task", 4096, NULL, 4, NULL);
 #if CONFIG_USE_LCD
 //    ESP_LOGD(TAG, "Starting app_lcd_task...");
 //    xTaskCreate(&app_lcd_task, "app_lcd_task", 4096, NULL, 4, NULL);

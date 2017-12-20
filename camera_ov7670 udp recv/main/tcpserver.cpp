@@ -25,7 +25,10 @@
 #include "camera.h"
 #include "bitmap.h"
 #include "iot_lcd.h"
+#include "lwip/inet.h"
+#include "lwip/sockets.h"
 #include "iot_tcp.h"
+#include "iot_udp.h"
 #include "iot_wifi_conn.h"
 #include "app_camera.h"
 #include "nvs_flash.h"
@@ -38,6 +41,7 @@
 #define SERVER_MAX_CONNECTION   20
 
 static const char* TAG_SRV = "TCP_SRV";
+static const char* TAG_UDP_SRV = "UDP_SRV";
 static EventGroupHandle_t wifi_event_group;
 volatile static uint32_t * * currFbPtr __attribute__ ((aligned(4))) = NULL;
 
@@ -152,4 +156,57 @@ void tcp_server_task(void *pvParameters)
        ESP_LOGI(TAG_SRV, "CTcpConn connected...");
        xTaskCreate(tcp_server_handle, "tcp_server_handle", 2048, (void* )conn, 6, NULL);
    }
+}
+
+void udp_server_task(void* pvParameters)
+{
+    CUdpConn server;
+    static uint8_t i = 0;
+    int recv_num = 0;
+    bool recv_ask_flag = false;
+    uint8_t recv_buf[5];
+
+    server.Bind(7777);
+    server.SetTimeout(1);
+
+    uint8_t* recv_data;
+    struct sockaddr_in remoteAddr;
+    size_t nAddrLen = sizeof(remoteAddr);
+    while (1) {
+        /*********start*********/
+        recv_ask_flag = false;
+        while(!recv_ask_flag){
+            recv_num = server.RecvFrom(recv_buf, sizeof(recv_buf), (struct sockaddr*) &remoteAddr, &nAddrLen);
+            if(recv_num < 0){ //send_again
+                // ESP_LOGI(TAG_UDP_SRV, "start error");
+                server.SendTo("11111", strlen("11111"), 0, (struct sockaddr*) &remoteAddr);
+            } else if(recv_buf[0] == 's'){
+                // ESP_LOGI(TAG_UDP_SRV, "start ok");
+                start_ask:
+                recv_ask_flag = true;
+                server.SendTo("start", strlen("start"), 0, (struct sockaddr*) &remoteAddr);
+            }
+        }
+        /*********start*********/
+        recv_data = (uint8_t *)currFbPtr[i % CAMERA_CACHE_NUM];
+        for(int j = 0;j < 150; j++){
+            recv_ask_flag = false;
+            while(!recv_ask_flag){
+                recv_num = server.RecvFrom(recv_data, 1024, (struct sockaddr*) &remoteAddr, &nAddrLen);
+                // ESP_LOGI(TAG_UDP_SRV, "j:%d,RecvFrom:%d", j, recv_num);
+                if (recv_num < 0) { //send_again
+                    server.SendTo("11111", strlen("11111"), 0, (struct sockaddr*) &remoteAddr);
+                } else if(recv_num == 1024){ //ack
+                    recv_data += 1024;
+                    recv_ask_flag = true;
+                    server.SendTo("22222", strlen("22222"), 0, (struct sockaddr*) &remoteAddr);
+                } else if(recv_data[0] == 's') {
+                    goto start_ask;
+                }
+            }
+        }
+        i = i % CAMERA_CACHE_NUM;
+        queue_send((uint16_t *)currFbPtr[i++]);
+    }
+    vTaskDelete(NULL);
 }

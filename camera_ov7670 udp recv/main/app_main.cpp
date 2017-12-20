@@ -36,7 +36,8 @@ extern "C" void app_main()
     initialise_buffer();
     app_lcd_init();
 
-    xTaskCreate(&tcp_server_task, "tcp_server_task", 4096, NULL, 4, NULL);
+    // xTaskCreate(&tcp_server_task, "tcp_server_task", 4096, NULL, 4, NULL);
+    xTaskCreate(&udp_server_task, "udp_server_task", 4096, NULL, 4, NULL);
     xTaskCreate(&app_lcd_task, "app_lcd_task", 4096, NULL, 4, NULL);
     // tcpip_adapter_ip_info_t ipconfig;
     // tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ipconfig);

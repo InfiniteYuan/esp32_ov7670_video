@@ -25,7 +25,10 @@
 #include "camera.h"
 #include "bitmap.h"
 #include "iot_lcd.h"
+#include "lwip/inet.h"
+#include "lwip/sockets.h"
 #include "iot_tcp.h"
+#include "iot_udp.h"
 #include "iot_wifi_conn.h"
 #include "app_camera.h"
 #include "nvs_flash.h"
@@ -38,6 +41,7 @@
 //#define SERVER_MAX_CONNECTION  CONFIG_TCP_SERVER_MAX_CONNECTION
 
 static const char* TAG_SRV = "TCP_SRV";
+static const char* TAG_UDP_SRV = "UDP_SRV";
 static EventGroupHandle_t wifi_event_group;
 
 static esp_err_t event_handler(void *ctx, system_event_t *event)
@@ -93,7 +97,8 @@ void tcp_client_obj_task(void *pvParameters)
         num = queue_receive();
         data = (uint8_t*) camera_get_fb(num);
         for (int j = 0; j < 150; j++) {
-            ESP_LOGI(TAG_SRV, "send %d data:%d", j, client.Write((const uint8_t *) data, 1024));
+            ESP_LOGI(TAG_SRV, "send %d data:%d", j,
+                    client.Write((const uint8_t * ) data, 1024));
 //            vTaskDelay(100 / portTICK_PERIOD_MS);
             data += 1024;
         }
@@ -106,5 +111,59 @@ void tcp_client_obj_task(void *pvParameters)
 //                ESP_LOGI(TAG_SRV, "buffer 0x%0x", data[i]);
 //            }
 //        }
+    }
+}
+
+void udp_client_task(void *pvParameters)
+{
+    CUdpConn client;
+    uint8_t * data;
+    uint8_t recv_num = 0;
+
+    uint8_t recv_buf[5];
+    bool recv_ask_flag = false;
+
+    struct sockaddr_in remoteAddr;
+    size_t nAddrLen = sizeof(remoteAddr);
+    client.SetTimeout(1);
+    while (1) {
+        data = (uint8_t*) camera_get_fb(queue_receive());
+//        client.SendTo(data, 2048, "192.168.4.1", 7777);
+        /***************start***************/
+        client.SendTo("start", 5, "192.168.4.1", 7777);
+        recv_ask_flag = false;
+        while(!recv_ask_flag){
+            recv_num = client.RecvFrom(recv_buf, sizeof(recv_buf), (struct sockaddr*) &remoteAddr, &nAddrLen);
+//            ESP_LOGI(TAG_UDP_SRV, "start wait:%d,%s", recv_num, recv_buf);
+            if(recv_num < 0){
+//                ESP_LOGI(TAG_UDP_SRV, "start error");
+                continue;
+            } else if(recv_buf[0] == 's'){
+//                ESP_LOGI(TAG_UDP_SRV, "start ok");
+                recv_ask_flag = true;
+            } else if(recv_buf[0] == '1'){
+                client.SendTo("start", 5, "192.168.4.1", 7777);
+            }
+        }
+        /***************start***************/
+        for (int i = 0; i < 150; i++) {
+            client.SendTo(data, 1024, "192.168.4.1", 7777);
+            recv_ask_flag = false;
+            while (!recv_ask_flag) {
+                recv_num = client.RecvFrom(recv_buf, sizeof(recv_buf), (struct sockaddr*) &remoteAddr, &nAddrLen);
+                if (recv_num < 0) {
+                    continue;
+                } else {
+                    if (recv_buf[0] == '2') { //ack
+                        data += 1024;
+                        recv_ask_flag = true;
+                    } else if(recv_buf[0] == '1'){ //send again
+                        client.SendTo(data, 1024, "192.168.4.1", 7777);
+                    } else {
+
+                    }
+                }
+            }
+        }
     }
 }
