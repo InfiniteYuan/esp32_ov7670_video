@@ -141,7 +141,7 @@ void app_lcd_task(void *pvParameters)
 
 void app_lcd_init()
 {
-    camera_queue = xQueueCreate(CAMERA_CACHE_NUM - 1, sizeof(camera_evt_t));
+    camera_queue = xQueueCreate(CAMERA_CACHE_NUM - 2, sizeof(camera_evt_t));
 //    lcd_conf_t lcd_pins = {
 //        .lcd_model = LCD_MOD_ST7789,  //LCD_MOD_ILI9341,//LCD_MOD_ST7789,
 //        .pin_num_miso = CONFIG_HW_LCD_MISO_GPIO,

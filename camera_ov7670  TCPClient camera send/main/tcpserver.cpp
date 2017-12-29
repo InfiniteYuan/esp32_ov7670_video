@@ -34,6 +34,15 @@
 #include "esp_event_loop.h"
 #include "freertos/event_groups.h"
 
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+#include "lwip/dns.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+#include "lwip/dns.h"
+
 //#define SERVER_PORT CONFIG_TCP_SERVER_PORT
 //#define SERVER_MAX_CONNECTION  CONFIG_TCP_SERVER_MAX_CONNECTION
 
@@ -80,31 +89,46 @@ void initialise_wifi(void)
 
 void tcp_client_obj_task(void *pvParameters)
 {
-    CTcpConn client;
+//    CTcpConn client;
     uint8_t num = 0;
     uint8_t * data;
-
-    if (client.Connect("192.168.4.1", 8080) < 0) {
+    uint32_t data1 = 0;
+    uint32_t length = 320*240*2;
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    int ret = 0;
+    struct sockaddr_in servaddr;
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(8080);
+    ret = inet_pton(AF_INET, "192.168.4.1", &servaddr.sin_addr);
+    ret = connect(sockfd, (struct sockaddr* )&servaddr, sizeof(servaddr));
+    if(ret<0){
         ESP_LOGI(TAG_SRV, "fail to connect...");
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
+//    if (client.Connect("192.168.4.1", 8080) < 0) {
+//        ESP_LOGI(TAG_SRV, "fail to connect...");
+//        vTaskDelay(5000 / portTICK_PERIOD_MS);
+//    }
 
     while (1) {
         num = queue_receive();
+
         data = (uint8_t*) camera_get_fb(num);
+
+//        length = 320*240*2;
+//        while(length > 0) {
+//            data1 = write(sockfd, (uint8_t *) data, length);
+//            data += data1;
+//            length -= data1;
+//        }
+
         for (int j = 0; j < 150; j++) {
-            ESP_LOGI(TAG_SRV, "send %d data:%d", j, client.Write((const uint8_t *) data, 1024));
+//            ESP_LOGI(TAG_SRV, "send %d data:%d", j, client.Write((const uint8_t *) data, 10000));
+//            ESP_LOGI(TAG_SRV, "send %d data:%d", j, send(sockfd, (const uint8_t *) data, 10240, 0));
+            data1 = write(sockfd, (uint8_t *) data, 1024);
+//            ESP_LOGI(TAG_SRV, "send %d data:%d", j, data1);
 //            vTaskDelay(100 / portTICK_PERIOD_MS);
             data += 1024;
         }
-//        if (client.Write((const uint8_t *)data, 320*240*2) < 0) {
-//            vTaskDelay(5000 / portTICK_PERIOD_MS);
-//            ESP_LOGI(TAG_SRV, "fail to send data...");
-//        } else {
-//            ESP_LOGI(TAG_SRV, "send data success...");
-//            for(int i=0;i<20;i++){
-//                ESP_LOGI(TAG_SRV, "buffer 0x%0x", data[i]);
-//            }
-//        }
     }
 }

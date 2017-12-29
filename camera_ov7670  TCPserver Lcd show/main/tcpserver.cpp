@@ -34,6 +34,18 @@
 #include "esp_event_loop.h"
 #include "freertos/event_groups.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_log.h"
+
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+#include "lwip/dns.h"
+#include "iot_tcp.h"
+
 #define SERVER_PORT             8080
 #define SERVER_MAX_CONNECTION   20
 
@@ -119,23 +131,41 @@ void tcp_server_handle(void* arg)
 {
     static uint8_t i = 0;
     uint8_t* data;
-    uint16_t data1;
-    CTcpConn *conn = (CTcpConn*) arg;
+    uint32_t data1;
+    uint32_t length = 320*240*2;
+//    CTcpConn *conn = (CTcpConn*) arg;
+//    conn->SetTimeout(10);
+    int sockfd = (int)arg;
+    struct timeval receiving_timeout;
+    receiving_timeout.tv_sec = 10;
+    receiving_timeout.tv_usec = 0;
+    data1 = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout, sizeof(receiving_timeout));
+    ESP_LOGI(TAG_SRV, "setsockopt %d", data1);
+
     while (1) {
-        if (conn) {
+        if (sockfd > 0) {
             data = (uint8_t *)currFbPtr[i % CAMERA_CACHE_NUM];
-            for(int j = 0;j < 150; j++){
-                if((data1 = conn->Read(data, 1024, 10)) != 1024){
-                    ESP_LOGI(TAG_SRV, "recv %d num: %d", j, data1);
-                    data += data1;
-                    data1 = conn->Read(data, 1024-data1, 10);
-                    data += data1;
-                    ESP_LOGI(TAG_SRV, "*****recv %d num: %d", j, data1);
-                } else {
-                    ESP_LOGI(TAG_SRV, "recv %d num: %d", j, data1);
-                    data += 1024;
-                }
+
+            length = 320*240*2;
+            while(length > 0){
+                data1 = recv(sockfd, (uint8_t *) data, length, MSG_WAITALL);
+//                ESP_LOGI(TAG_SRV, "recv %d num", data1);
+                data += data1;
+                length -= data1;
             }
+
+//            for(int j = 0;j < 1200; j++){
+////                data1 = recv(sockfd, data, 10000, 0);
+////                data1 = read(sockfd, data, 10240);
+//                length = 128;
+//                while(length > 0)
+//                {
+//                    data1 = recv(sockfd, data, length, MSG_WAITALL);
+//                    length -= data1;
+//                }
+//                data += 128;
+////                ESP_LOGI(TAG_SRV, "read recv %d num: %d", j, data1);
+//            }
             i = i % CAMERA_CACHE_NUM;
             queue_send((uint16_t *)currFbPtr[i++]);
         }
@@ -144,12 +174,27 @@ void tcp_server_handle(void* arg)
 
 void tcp_server_task(void *pvParameters)
 {
-   CTcpServer server;
-   server.Listen(SERVER_PORT, SERVER_MAX_CONNECTION);   
+//   CTcpServer server;
+//   server.Listen(SERVER_PORT, SERVER_MAX_CONNECTION);
 
+    struct sockaddr_in server_addr;
+    /* Construct local address structure */
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET; /* Internet address family */
+    server_addr.sin_addr.s_addr = INADDR_ANY; /* Any incoming interface */
+    server_addr.sin_len = sizeof(server_addr);
+    server_addr.sin_port = htons(SERVER_PORT); /* Local port */
+
+    int sockfd;
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    bind(sockfd, (struct sockaddr * )&server_addr, sizeof(server_addr));
+    listen(sockfd, SERVER_MAX_CONNECTION);
+
+    int acceptsockfd = -1;
    while (1) {
-       CTcpConn* conn = server.Accept();
+//       CTcpConn* conn = server.Accept();
+       acceptsockfd = accept(sockfd, (struct sockaddr*) NULL, NULL);
        ESP_LOGI(TAG_SRV, "CTcpConn connected...");
-       xTaskCreate(tcp_server_handle, "tcp_server_handle", 2048, (void* )conn, 6, NULL);
+       xTaskCreate(tcp_server_handle, "tcp_server_handle", 2048, (void* )acceptsockfd, 6, NULL);
    }
 }

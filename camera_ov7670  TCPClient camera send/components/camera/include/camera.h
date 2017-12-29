@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 /* define camera cache photo page num */
-#define CAMERA_CACHE_NUM 5
+#define CAMERA_CACHE_NUM 6
 
 typedef enum {
     CAMERA_PF_RGB565 = 0,       //!< RGB, 2 bytes per pixel
