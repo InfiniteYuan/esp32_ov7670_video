@@ -53,12 +53,12 @@
 /**
  * @breif call xSemaphoreTake to receive camera frame number
  */
-uint16_t * queue_receive();
+uint8_t queue_receive();
 
 /**
  * @breif call xSemaphoreGive to send camera frame number
  */
-void queue_send(uint16_t * frame_buffer);
+void queue_send(uint8_t frame_num);
 
 uint8_t queue_available();
 
@@ -72,8 +72,12 @@ void tcp_server_task(void *pvParameters);
 
 void udp_server_task(void* pvParameters);
 
+void udp_server_recv_pack_task(void* pvParameters);
+
 void initialise_wifi(void);
 
 void initialise_buffer(void);
+
+extern volatile uint32_t * * currFbPtr;
 
 #endif

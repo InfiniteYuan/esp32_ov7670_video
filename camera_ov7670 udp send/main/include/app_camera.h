@@ -74,4 +74,6 @@ void tcp_client_obj_task(void *pvParameters);
 
 void udp_client_task(void *pvParameters);
 
+void udp_client_send_pack_task(void *pvParameters);
+
 #endif

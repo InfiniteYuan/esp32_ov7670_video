@@ -33,24 +33,24 @@
 CEspLcd* tft = NULL;
 
 typedef struct {
-    uint16_t * frame_buffer;
+    uint8_t frame_num;
 }camera_evt_t;
 
 QueueHandle_t camera_queue = NULL;
 static const char* TAG = "ESP-CAM-LCD";
 
-void queue_send(uint16_t * frame_buffer)
+void queue_send(uint8_t frame_num)
 {
     camera_evt_t camera_event;
-    camera_event.frame_buffer = frame_buffer;
+    camera_event.frame_num = frame_num;
     xQueueSend(camera_queue, &camera_event, portMAX_DELAY);
 }
 
-uint16_t * queue_receive()
+uint8_t queue_receive()
 {
     camera_evt_t camera_event;
     xQueueReceive(camera_queue, &camera_event, portMAX_DELAY);
-    return camera_event.frame_buffer;
+    return camera_event.frame_num;
 }
 
 uint8_t queue_available()
@@ -63,18 +63,21 @@ void app_lcd_task(void *pvParameters)
     uint8_t i = 0;
     uint32_t time = 0;
     camera_evt_t camera_event;
-    camera_event.frame_buffer = 0;
+    camera_event.frame_num = 0;
     time = xTaskGetTickCount();
+
     while(1) {
-        xQueueReceive(camera_queue, &camera_event, portMAX_DELAY);
-        if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ) {
-            ESP_LOGI(TAG,"app_lcd_task movie %d  fps", i);
-            time = xTaskGetTickCount();
-            i = 0;
-        }
-        i++;
-        tft->drawBitmap(0, 0, camera_event.frame_buffer, 320, 240, false);
+         xQueueReceive(camera_queue, &camera_event, portMAX_DELAY);
+         if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ) {
+             ESP_LOGI(TAG,"app_lcd_task movie %d  fps", i);
+             time = xTaskGetTickCount();
+             i = 0;
+         }
+         i++;
+        tft->drawBitmap(0, 0, (uint16_t*)currFbPtr[camera_event.frame_num], 320, 240, false);
+//         tft->drawBitmap(0, 0, (uint16_t*)camera_get_fb(camera_event.frame_num), 320, 240, false);
         // vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }
 
@@ -89,7 +92,7 @@ void app_lcd_init()
         .pin_num_dc   = GPIO_NUM_21,//GPIO_NUM_16,//GPIO_NUM_21,
         .pin_num_rst  = GPIO_NUM_18,//GPIO_NUM_33,//GPIO_NUM_18,
         .pin_num_bckl = GPIO_NUM_5,//GPIO_NUM_17,//GPIO_NUM_5,
-        .clk_freq     = 10 * 1000 * 1000,
+        .clk_freq     = 20 * 1000 * 1000,
         .rst_active_level = 0,
         .bckl_active_level = 0,
         .spi_host = HSPI_HOST,
@@ -98,7 +101,7 @@ void app_lcd_init()
     /*Initialize SPI Handler*/
     if (tft == NULL) {
         tft = new CEspLcd(&lcd_pins);
-        camera_queue = xQueueCreate(CAMERA_CACHE_NUM - 1, sizeof(camera_evt_t));
+        camera_queue = xQueueCreate(CAMERA_CACHE_NUM - 2, sizeof(camera_evt_t));
     }
 
     /*screen initialize*/

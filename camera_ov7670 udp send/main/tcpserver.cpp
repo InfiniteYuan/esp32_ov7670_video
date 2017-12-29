@@ -27,6 +27,13 @@
 #include "iot_lcd.h"
 #include "lwip/inet.h"
 #include "lwip/sockets.h"
+
+#include "lwip/err.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+#include "lwip/dns.h"
+#include "lwip/def.h"
+
 #include "iot_tcp.h"
 #include "iot_udp.h"
 #include "iot_wifi_conn.h"
@@ -88,19 +95,33 @@ void tcp_client_obj_task(void *pvParameters)
     uint8_t num = 0;
     uint8_t * data;
 
-    if (client.Connect("192.168.4.1", 8080) < 0) {
+//    if (client.Connect("192.168.4.1", 8080) < 0) {
+    if (client.Connect("192.168.0.5", 7777) < 0) {
         ESP_LOGI(TAG_SRV, "fail to connect...");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 
+    uint32_t time = 0;
+    uint32_t time1 = 0;
+    time = xTaskGetTickCount();
+    uint32_t i = 0;
     while (1) {
         num = queue_receive();
         data = (uint8_t*) camera_get_fb(num);
+        if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ) {
+             ESP_LOGI(TAG_UDP_SRV,"sendto %d  fps", i);
+             time = xTaskGetTickCount();
+             i = 0;
+         }
         for (int j = 0; j < 150; j++) {
-            ESP_LOGI(TAG_SRV, "send %d data:%d", j,
-                    client.Write((const uint8_t * ) data, 1024));
+//            ESP_LOGI(TAG_SRV, "send %d data:%d", j,
+//                    client.Write((const uint8_t * ) data, 1024));
 //            vTaskDelay(100 / portTICK_PERIOD_MS);
+            ESP_LOGI(TAG_SRV, "start send");
+            client.Write((const uint8_t * ) data, 1024);
+            ESP_LOGI(TAG_SRV, "stop send");
             data += 1024;
+            i++;
         }
 //        if (client.Write((const uint8_t *)data, 320*240*2) < 0) {
 //            vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -114,56 +135,168 @@ void tcp_client_obj_task(void *pvParameters)
     }
 }
 
+typedef struct
+{
+    uint8_t pack_num;
+    uint8_t* data_point;
+} data_pack;
+
 void udp_client_task(void *pvParameters)
 {
-    CUdpConn client;
+//    CUdpConn client;
+    int socketid;
     uint8_t * data;
+    uint8_t * data1;
     uint8_t recv_num = 0;
+    uint8_t send_num = 0;
+    data_pack pack;
 
     uint8_t recv_buf[5];
     bool recv_ask_flag = false;
 
+    socketid = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    struct timeval receiving_timeout;
+    receiving_timeout.tv_sec = 1;
+    receiving_timeout.tv_usec = 0;
+    setsockopt(socketid, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
+            sizeof(receiving_timeout));
+
     struct sockaddr_in remoteAddr;
     size_t nAddrLen = sizeof(remoteAddr);
-    client.SetTimeout(1);
     while (1) {
         data = (uint8_t*) camera_get_fb(queue_receive());
-//        client.SendTo(data, 2048, "192.168.4.1", 7777);
+        data1 = data;
         /***************start***************/
-        client.SendTo("start", 5, "192.168.4.1", 7777);
+        sockaddr_in sin;
+        sin.sin_family = AF_INET;
+        sin.sin_port = htons(7777);
+        sin.sin_addr.s_addr = inet_addr("192.168.4.1");
+        int len = sizeof(sin);
+        start: int ret = sendto(socketid, "start", 5, 0, (sockaddr *) &sin,
+                len);
+
         recv_ask_flag = false;
-        while(!recv_ask_flag){
-            recv_num = client.RecvFrom(recv_buf, sizeof(recv_buf), (struct sockaddr*) &remoteAddr, &nAddrLen);
+        while (!recv_ask_flag) {
+//            recv_num = client.RecvFrom(recv_buf, sizeof(recv_buf), (struct sockaddr*) &remoteAddr, &nAddrLen);
+            recv_num = recvfrom(socketid, recv_buf, sizeof(recv_buf), 0,
+                    (struct sockaddr*) &remoteAddr, &nAddrLen);
+
 //            ESP_LOGI(TAG_UDP_SRV, "start wait:%d,%s", recv_num, recv_buf);
-            if(recv_num < 0){
+            if (recv_num < 0) {
 //                ESP_LOGI(TAG_UDP_SRV, "start error");
                 continue;
-            } else if(recv_buf[0] == 's'){
-//                ESP_LOGI(TAG_UDP_SRV, "start ok");
+            } else if (recv_buf[0] == 's') {
+                ESP_LOGI(TAG_UDP_SRV, "start ok");
                 recv_ask_flag = true;
-            } else if(recv_buf[0] == '1'){
-                client.SendTo("start", 5, "192.168.4.1", 7777);
+            } else if (recv_buf[0] == '3') {
+                sendto(socketid, "start", 5, 0, (sockaddr *) &sin, len);
             }
         }
         /***************start***************/
+//        for (int i = 0; i < 150; i++) {
+//            pack.pack_num = i;
+//            pack.data_point = data1;
+//            sendto(socketid, (uint8_t *)pack, 1025, 0, (sockaddr * )&sin, len);
+//        }
+        /*********** test ************/
+//        int j = 0;
+//        uint32_t time = 0;
+//        time = xTaskGetTickCount();
+//        ESP_LOGI(TAG_UDP_SRV, "start send");
+//        while(1) {
+//            if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
+//                ESP_LOGI(TAG_UDP_SRV,"app_camera_task movie %d fps", j);
+//                time = xTaskGetTickCount();
+//                j = 0;
+//            }
+//            data1 = data;
+//            for (int i = 0; i < 150; i++) {
+//                sendto(socketid, data1, 1024, 0, (sockaddr * )&sin, len);
+//                data1 += 1024;
+//                j++;
+//            }
+//        }
+        /*********** test ************/
+
         for (int i = 0; i < 150; i++) {
-            client.SendTo(data, 1024, "192.168.4.1", 7777);
+            sendto(socketid, data, 1024, 0, (sockaddr *) &sin, len);
             recv_ask_flag = false;
             while (!recv_ask_flag) {
-                recv_num = client.RecvFrom(recv_buf, sizeof(recv_buf), (struct sockaddr*) &remoteAddr, &nAddrLen);
+                recv_num = recvfrom(socketid, recv_buf, sizeof(recv_buf), 0,
+                        (struct sockaddr*) &remoteAddr, &nAddrLen);
                 if (recv_num < 0) {
                     continue;
                 } else {
                     if (recv_buf[0] == '2') { //ack
                         data += 1024;
                         recv_ask_flag = true;
-                    } else if(recv_buf[0] == '1'){ //send again
-                        client.SendTo(data, 1024, "192.168.4.1", 7777);
-                    } else {
-
+                    } else if (recv_buf[0] == '1') { //send again
+                        sendto(socketid, data, 1024, 0, (sockaddr *) &sin, len);
+                    } else if (recv_buf[0] == '3') {
+                        goto start;
                     }
                 }
             }
         }
+    }
+}
+
+void udp_client_send_pack_task(void *pvParameters)
+{
+//    CUdpConn client;
+    int socketid;
+    uint8_t * data;
+    uint8_t * data1;
+    uint8_t recv_num = 0;
+    uint16_t send_num = 0;
+    uint8_t frame_num = 0;
+    uint8_t* pack = (uint8_t*) pvParameters;
+
+    uint8_t recv_buf[5];
+    bool recv_ask_flag = false;
+    bool send_comp = false;
+
+    socketid = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    struct timeval receiving_timeout;
+    receiving_timeout.tv_sec = 1;
+    receiving_timeout.tv_usec = 0;
+    setsockopt(socketid, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
+            sizeof(receiving_timeout));
+
+    struct sockaddr_in remoteAddr;
+    size_t nAddrLen = sizeof(remoteAddr);
+
+    sockaddr_in remote_addr;
+    remote_addr.sin_family = AF_INET;
+    remote_addr.sin_port = htons(7777);
+    remote_addr.sin_addr.s_addr = inet_addr("192.168.4.1");
+//    sin.sin_addr.s_addr = inet_addr("192.168.0.5");
+    int len = sizeof(remote_addr);
+
+    uint32_t time = 0;
+    uint32_t time1 = 0;
+    time = xTaskGetTickCount();
+    uint32_t j = 0;
+
+    while (1) {
+        frame_num = queue_receive();
+        if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ) {
+             ESP_LOGI(TAG_UDP_SRV,"sendto %d  fps", j);
+             time = xTaskGetTickCount();
+             j = 0;
+         }
+//        ESP_LOGI(TAG_UDP_SRV, "queue_receive %d ms", (time1-time)*portTICK_RATE_MS);
+        data = (uint8_t*) camera_get_fb(frame_num);
+        data1 = data;
+        for (int i = 0; i < 150; i++) {
+            pack[0] = i>>8;
+            pack[1] = i&0xff;
+            memcpy(pack + 2, data1 + i * 1024, 1024);
+            send_num = sendto(socketid, pack, 1026, 0, (sockaddr *) &remote_addr, len);
+//            ESP_LOGI(TAG_UDP_SRV, "send num %d", send_num);
+//            sendto(socketid, data1 + i * 10240, 10240, 0, (sockaddr *) &sin, len);
+
+        }
+        j++;
     }
 }
