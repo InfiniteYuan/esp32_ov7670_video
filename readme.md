@@ -9,7 +9,9 @@
 - 摄像头采集图像、LCD 实时显示刷新速率达到 22fps
 
 ## 硬件连接
-按照默认的`make menuconfig`中的默认配置连接即可，如果使用`ESP-WROVER-KIT`开发板，请注意把 LCD 的 reset 引脚上拉，否则 LCD 无法正常复位。
+按照默认的`make menuconfig`中的默认配置连接即可。
+> 注: 如果使用`ESP-WROVER-KIT`开发板，请注意把 LCD 的 reset 引脚上拉，否则 LCD 无法正常复位。
+> 注: 如果 LCD 的背光灯没有正常亮起，可以将背光灯引脚直接接到高/低电平。
 
 ## 硬件实物图
 该工程默认使用的为`ESP-WROVER-KIT`开发板;
