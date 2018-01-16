@@ -62,6 +62,14 @@ void queue_send(uint8_t frame_num);
 
 uint8_t queue_available();
 
+void lcd_init_wifi(void);
+
+void lcd_camera_init_complete(void);
+
+void lcd_wifi_connect_complete(void);
+
+void lcd_http_info(ip4_addr_t s_ip_addr);
+
 void app_lcd_init(void);
 
 void app_lcd_task(void *pvParameters);

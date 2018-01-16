@@ -26,6 +26,8 @@
 #include "bitmap.h"
 #include "iot_lcd.h"
 #include "iot_wifi_conn.h"
+#include "nvs_flash.h"
+#include "esp_event_loop.h"
 #include "app_camera.h"
 
 static const char* TAG = "ESP-CAM";
@@ -83,7 +85,7 @@ void app_camera_init()
 
     config.displayBuffer = (uint32_t**) currFbPtr;
     config.pixel_format = CAMERA_PIXEL_FORMAT;
-//    config.test_pattern_enabled = CONFIG_ENABLE_TEST_PATTERN;
+    // config.test_pattern_enabled = CONFIG_ENABLE_TEST_PATTERN;
 
     err = camera_init(&config);
     if (err != ESP_OK) {
@@ -94,41 +96,87 @@ void app_camera_init()
 
 static void app_camera_task(void *pvParameters)
 {
-    uint32_t i = 0;
-    uint8_t frame_num = 0;
-    uint32_t time = 0;
-    time = xTaskGetTickCount();
+    // uint32_t i = 0;
+    // uint32_t time = 0;
+    // time = xTaskGetTickCount();
     while (1) {
-//        queue_send(i%CAMERA_CACHE_NUM);
-//        if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
-//            ESP_LOGI(TAG,"app_camera_task movie %d fps", i);
-//            time = xTaskGetTickCount();
-//            i = 0;
-//        }
-//        i++;
-        if ((frame_num = camera_run()) != ESP_FAIL) {
-            queue_send(frame_num % CAMERA_CACHE_NUM);
-        }
+        // if((xTaskGetTickCount() - time) > 1000 / portTICK_RATE_MS ){
+        //    ESP_LOGI(TAG,"app_camera_task movie %d fps", i);
+        //    time = xTaskGetTickCount();
+        //    i = 0;
+        // }
+        // i++;
+        queue_send(camera_run() % CAMERA_CACHE_NUM);
     }
+}
+
+static esp_err_t event_handler(void *ctx, system_event_t *event)
+{
+    switch (event->event_id) {
+        case SYSTEM_EVENT_STA_START:
+            esp_wifi_connect();
+            break;
+        case SYSTEM_EVENT_STA_GOT_IP:
+            break;
+        case SYSTEM_EVENT_STA_DISCONNECTED:
+            esp_wifi_connect();
+            break;
+        default:
+            break;
+    }
+    return ESP_OK;
+}
+
+void initialise_wifi(void)
+{
+    ESP_ERROR_CHECK(nvs_flash_init());
+    tcpip_adapter_init();
+    ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+    wifi_config_t wifi_config;
+    memcpy(wifi_config.ap.ssid, "ESP32-CAM_DEMO", sizeof("ESP32-CAM_DEMO"));
+    memcpy(wifi_config.ap.password, "123456789", sizeof("123456789"));
+    wifi_config.ap.ssid_len = strlen("ESP32-CAM_DEMO");
+    wifi_config.ap.max_connection = 1;
+    wifi_config.ap.authmode = WIFI_AUTH_WPA_PSK;
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
+    esp_wifi_start();
 }
 
 extern "C" void app_main()
 {
-    app_camera_init();
 #if CONFIG_USE_LCD
     app_lcd_init();
 #endif
 
-    CWiFi *my_wifi = CWiFi::GetInstance(WIFI_MODE_STA);
-    printf("connect wifi\n");
-    my_wifi->Connect(WIFI_SSID, WIFI_PASSWORD, portMAX_DELAY);
+    app_camera_init();
+
+#if CONFIG_USE_LCD
+    lcd_camera_init_complete();
+    lcd_init_wifi();
+#endif
+
+    initialise_wifi();
+    tcpip_adapter_ip_info_t ipconfig;
+    tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ipconfig);
+    ip4_addr_t s_ip_addr = ipconfig.ip;
+
+#if CONFIG_USE_LCD
+    lcd_wifi_connect_complete();
+    lcd_http_info(s_ip_addr);
+    vTaskDelay(8000 / portTICK_RATE_MS);
+#endif
 
     // VERY UNSTABLE without this delay after init'ing wifi... however, much more stable with a new Power Supply
     vTaskDelay(500 / portTICK_RATE_MS);
     ESP_LOGI(TAG, "Free heap: %u", xPortGetFreeHeapSize());
 
-//    ESP_LOGD(TAG, "Starting http_server task...");
-//    xTaskCreatePinnedToCore(&http_server_task, "http_server_task", 4096, NULL, 5, NULL, 1);
+    ESP_LOGD(TAG, "Starting http_server task...");
+    xTaskCreatePinnedToCore(&http_server_task, "http_server_task", 4096, NULL, 5, NULL, 1);
 
 #if CONFIG_USE_LCD
     ESP_LOGD(TAG, "Starting app_lcd_task...");
@@ -138,7 +186,6 @@ extern "C" void app_main()
     ESP_LOGD(TAG, "Starting app_camera_task...");
     xTaskCreate(&app_camera_task, "app_camera_task", 4096, NULL, 3, NULL);
 
-    ip4_addr_t s_ip_addr = my_wifi->IP();
     ESP_LOGI(TAG, "open http://" IPSTR "/bmp for single image/bitmap image", IP2STR(&s_ip_addr));
     ESP_LOGI(TAG, "open http://" IPSTR "/get for raw image as stored in framebuffer ", IP2STR(&s_ip_addr));
 

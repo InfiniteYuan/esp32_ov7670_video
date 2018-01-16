@@ -21,7 +21,6 @@
   * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
   *
   */
-#include "../components/qrlib/include/quirc_internal.h"
 #include "lwip/api.h"
 #include "camera.h"
 #include "bitmap.h"
@@ -58,67 +57,6 @@ uint8_t queue_available()
     return uxQueueSpacesAvailable(camera_queue);
 }
 
-void convert(unsigned char *img565, unsigned char *imgGray, int iWidth, int iHeight)
-{
-    uint16_t * pData565 ;
-    pData565 = (uint16_t *)img565;
-    int iIndex = 0;
-    for (int x = 0; x < iHeight; ++x)
-    {
-        for (int y = 0; y < iWidth; ++y)
-        {
-//            unsigned char chR = *(pData565 + iIndex) & RGB565_MASK_RED >> 11;
-//            unsigned char chG = *(pData565 + iIndex) & RGB565_MASK_GREEN >> 5;
-//            unsigned char chB = *(pData565 + iIndex) & RGB565_MASK_BLUE;
-            unsigned char chR = ((*(pData565 + iIndex) & RGB565_MASK_RED) >> 11 ) << 3;
-            unsigned char chG = ((*(pData565 + iIndex) & RGB565_MASK_GREEN) >> 5) << 2;
-            unsigned char chB = (*(pData565 + iIndex) & RGB565_MASK_BLUE) << 3 ;
-            unsigned char chGray = (chR*30 + chG*59 + chB*11 + 50) / 100;//(chB*0.3 +chR*0.11 +chG*0.59);
-            *(imgGray + x * iWidth + y) = chGray;
-            ++iIndex;
-        }
-    }
-}
-
-void qrdecode(uint8_t j)
-{
-    struct quirc *qr;
-    int num_codes;
-    int i;
-    uint8_t *image;
-    int w, h;
-
-    qr = quirc_new();
-    if (!qr) {
-        perror("Failed to allocate memory");
-        abort();
-    }
-
-    if (quirc_resize(qr, 320, 240) < 0) {
-        perror("Failed to allocate video memory");
-        abort();
-    }
-
-    image = quirc_begin(qr, &w, &h);
-    quirc_end(qr);
-//    convert((unsigned char *)camera_get_fb(j), image, 320, 240);
-//    num_codes = quirc_count(qr);
-//    for (i = 0; i < num_codes; i++) {
-//        struct quirc_code code;
-//        struct quirc_data data;
-//        quirc_decode_error_t err;
-//
-//        quirc_extract(qr, i, &code);
-//
-//        /* Decoding stage */
-//        err = quirc_decode(&code, &data);
-//        if (err)
-//            printf("DECODE FAILED: %s\n", quirc_strerror(err));
-//        else
-//            printf("Data: %s\n", data.payload);
-//    }
-}
-
 void app_lcd_task(void *pvParameters)
 {
     uint8_t i = 0;
@@ -134,10 +72,33 @@ void app_lcd_task(void *pvParameters)
             i = 0;
         }
         i++;
-//        time = xTaskGetTickCount();
         tft->drawBitmap(0, 0, (uint16_t *)camera_get_fb(camera_event.frame_num), camera_get_fb_width(), camera_get_fb_height(), false);
-//        ESP_LOGI(TAG,"app_lcd_task use time %d  ms", (xTaskGetTickCount()-time) * portTICK_RATE_MS);
     }
+}
+
+void lcd_init_wifi(void)
+{
+    tft->drawString("Status: Wifi initializing ...", 5, 58);
+}
+
+void lcd_camera_init_complete(void)
+{
+    tft->drawString("Status: Camera initialize complete.", 5, 44);
+}
+
+void lcd_wifi_connect_complete(void)
+{
+    tft->drawString("Status: Wifi initialize complete.", 5, 72);
+    tft->drawString("Status: SSID:ESP32-CAM_DEMO KEY:123456789", 5, 86);
+}
+
+void lcd_http_info(ip4_addr_t s_ip_addr)
+{
+    char ipadd[50];
+    sprintf(ipadd, "open http://" IPSTR "/bmp for bitmap image", IP2STR(&s_ip_addr));
+    tft->drawString(ipadd, 5, 100);
+    sprintf(ipadd, "open http://" IPSTR "/get for img", IP2STR(&s_ip_addr));
+    tft->drawString(ipadd, 5, 114);
 }
 
 void app_lcd_init()
@@ -168,6 +129,5 @@ void app_lcd_init()
     tft->fillScreen(COLOR_GREEN);
     tft->drawBitmap(0, 0, esp_logo, 137, 26);
     tft->drawString("Status: Initialize camera ...", 5, 30);
-    tft->drawString("Status: Wifi Connecting ...", 5, 44);
 }
 #endif
