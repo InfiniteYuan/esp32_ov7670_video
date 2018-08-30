@@ -25,8 +25,8 @@
 #include "camera.h"
 #include "bitmap.h"
 #include "iot_lcd.h"
-#include "iot_wifi_conn.h"
 #include "app_camera.h"
+#include "esp_log.h"
 
 #if CONFIG_USE_LCD
 CEspLcd* tft = NULL;
@@ -72,7 +72,9 @@ void app_lcd_task(void *pvParameters)
             i = 0;
         }
         i++;
-        tft->drawBitmap(0, 0, (uint16_t *)camera_get_fb(camera_event.frame_num), camera_get_fb_width(), camera_get_fb_height(), false);
+        // tft->drawBitmap(0, 0, (uint16_t *)camera_get_fb(camera_event.frame_num), camera_get_fb_width(), camera_get_fb_height(), false);
+        tft->drawBitmapnotswap(0, 0, (uint16_t *)camera_get_fb(camera_event.frame_num), camera_get_fb_width(), camera_get_fb_height());
+        // tft->drawBitmapnotswap(0, 0, (uint16_t *)camera_get_fb(0), camera_get_fb_width(), camera_get_fb_height());
     }
 }
 
@@ -95,16 +97,16 @@ void lcd_wifi_connect_complete(void)
 void lcd_http_info(ip4_addr_t s_ip_addr)
 {
     char ipadd[50];
-    sprintf(ipadd, "open http://" IPSTR "/bmp for bitmap image", IP2STR(&s_ip_addr));
+    // sprintf(ipadd, "open http://" IPSTR "/bmp for bitmap image", IP2STR(&s_ip_addr));
     tft->drawString(ipadd, 5, 100);
-    sprintf(ipadd, "open http://" IPSTR "/get for img", IP2STR(&s_ip_addr));
+    // sprintf(ipadd, "open http://" IPSTR "/get for img", IP2STR(&s_ip_addr));
     tft->drawString(ipadd, 5, 114);
 }
 
 void app_lcd_init()
 {
     lcd_conf_t lcd_pins = {
-        .lcd_model = LCD_MOD_ST7789,  //LCD_MOD_ILI9341,//LCD_MOD_ST7789,
+        .lcd_model = LCD_MOD_ILI9341,  //LCD_MOD_ILI9341,//LCD_MOD_ST7789,
         .pin_num_miso = CONFIG_HW_LCD_MISO_GPIO,
         .pin_num_mosi = CONFIG_HW_LCD_MOSI_GPIO,
         .pin_num_clk = CONFIG_HW_LCD_CLK_GPIO,
@@ -112,10 +114,11 @@ void app_lcd_init()
         .pin_num_dc = CONFIG_HW_LCD_DC_GPIO,
         .pin_num_rst = CONFIG_HW_LCD_RESET_GPIO,
         .pin_num_bckl = CONFIG_HW_LCD_BL_GPIO,
-        .clk_freq = 40 * 1000 * 1000,
+        .clk_freq = 26 * 1000 * 1000,
         .rst_active_level = 0,
         .bckl_active_level = 0,
-        .spi_host = HSPI_HOST,};
+        .spi_host = HSPI_HOST,
+        .init_spi_bus = true};
 
     /*Initialize SPI Handler*/
     if (tft == NULL) {

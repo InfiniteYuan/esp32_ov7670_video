@@ -5,6 +5,11 @@ config USE_LCD
     default y
     help
         whether use camera with lcd screen.
+config USE_HTTP
+    bool "use HTTP"
+    default n
+    help
+        whether use HTTP 
 
 config WIFI_SSID
     string "WiFi SSID"

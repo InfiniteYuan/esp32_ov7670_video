@@ -25,12 +25,32 @@
 #include "camera.h"
 #include "bitmap.h"
 #include "iot_lcd.h"
-#include "iot_wifi_conn.h"
-#include "nvs_flash.h"
 #include "esp_event_loop.h"
 #include "app_camera.h"
+#include "esp_log.h"
+#include "esp_wifi.h"
+#include "esp_wpa2.h"
+#include "esp_system.h"
+#include "nvs_flash.h"
+#include "tcpip_adapter.h"
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+#include "lwip/dns.h"
+#include "freertos/queue.h"
+#include "freertos/event_groups.h"
 
-static const char* TAG = "ESP-CAM";
+static const char *TAG = "ESP-CAM";
+
+/* FreeRTOS event group to signal when we are connected & ready to make a request */
+static EventGroupHandle_t wifi_event_group;
+
+/* The event group allows multiple bits for each event,
+   but we only care about one event - are we connected
+   to the AP with an IP? */
+static const int CONNECTED_BIT = BIT0;
+static const int WIFI_INIT_DONE_BIT = BIT1;
 
 void app_camera_init()
 {
@@ -57,11 +77,11 @@ void app_camera_init()
 
     //Warning: This gets squeezed into IRAM.
     volatile static uint32_t * * currFbPtr __attribute__ ((aligned(4))) = NULL;
-    currFbPtr= (volatile uint32_t **)malloc(sizeof(uint32_t *) * CAMERA_CACHE_NUM);
+    currFbPtr = (volatile uint32_t **)malloc(sizeof(uint32_t *) * CAMERA_CACHE_NUM);
 
     ESP_LOGI(TAG, "get free size of 32BIT heap : %d\n", heap_caps_get_free_size(MALLOC_CAP_32BIT));
 
-    for(int i = 0; i < CAMERA_CACHE_NUM; i++){
+    for (int i = 0; i < CAMERA_CACHE_NUM; i++) {
         currFbPtr[i] = (volatile uint32_t *) heap_caps_malloc(320 * 240 * 2, MALLOC_CAP_32BIT);
         ESP_LOGI(TAG, "framebuffer address is:%p\n", currFbPtr[i]);
     }
@@ -83,9 +103,9 @@ void app_camera_init()
         ESP_LOGI(TAG, "Cant detected ov7670 camera");
     }
 
-    config.displayBuffer = (uint32_t**) currFbPtr;
+    config.displayBuffer = (uint32_t **) currFbPtr;
     config.pixel_format = CAMERA_PIXEL_FORMAT;
-    // config.test_pattern_enabled = CONFIG_ENABLE_TEST_PATTERN;
+    config.test_pattern_enabled = 0;
 
     err = camera_init(&config);
     if (err != ESP_OK) {
@@ -107,36 +127,54 @@ static void app_camera_task(void *pvParameters)
         // }
         // i++;
         queue_send(camera_run() % CAMERA_CACHE_NUM);
+        // camera_run();
     }
 }
 
 static esp_err_t event_handler(void *ctx, system_event_t *event)
 {
     switch (event->event_id) {
-        case SYSTEM_EVENT_STA_START:
-            esp_wifi_connect();
-            break;
-        case SYSTEM_EVENT_STA_GOT_IP:
-            break;
-        case SYSTEM_EVENT_STA_DISCONNECTED:
-            esp_wifi_connect();
-            break;
-        default:
-            break;
+    case SYSTEM_EVENT_AP_START:
+        xEventGroupSetBits(wifi_event_group, WIFI_INIT_DONE_BIT);
+        ESP_LOGI(TAG, "ap init down");
+        break;
+    case SYSTEM_EVENT_AP_STACONNECTED:
+        xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+        ESP_LOGI(TAG, "sta connect");
+        break;
+    case SYSTEM_EVENT_STA_START:
+        esp_wifi_connect();
+        break;
+    case SYSTEM_EVENT_STA_GOT_IP:
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        esp_wifi_connect();
+        break;
+    default:
+        break;
     }
     return ESP_OK;
 }
 
 void initialise_wifi(void)
 {
+    tcpip_adapter_ip_info_t ip_info;
     ESP_ERROR_CHECK(nvs_flash_init());
+    // set TCP range
     tcpip_adapter_init();
-    ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
+    tcpip_adapter_dhcps_stop(TCPIP_ADAPTER_IF_AP);
+    tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info);
+    ip_info.ip.addr = inet_addr("192.168.0.1");
+    ip_info.gw.addr = inet_addr("192.168.0.0");
+    tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_AP, &ip_info);
+    tcpip_adapter_dhcps_start(TCPIP_ADAPTER_IF_AP);
+    // wifi init
+    wifi_event_group = xEventGroupCreate();
+    ESP_ERROR_CHECK( esp_event_loop_init(event_handler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
+    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_AP) );
 
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     wifi_config_t wifi_config;
     memcpy(wifi_config.ap.ssid, "ESP32-CAM_DEMO", sizeof("ESP32-CAM_DEMO"));
     memcpy(wifi_config.ap.password, "123456789", sizeof("123456789"));
@@ -160,34 +198,39 @@ extern "C" void app_main()
     lcd_init_wifi();
 #endif
 
+#if CONFIG_USE_HTTP
     initialise_wifi();
     tcpip_adapter_ip_info_t ipconfig;
     tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_AP, &ipconfig);
     ip4_addr_t s_ip_addr = ipconfig.ip;
+#endif
 
-#if CONFIG_USE_LCD
+#if CONFIG_USE_LCD && CONFIG_USE_HTTP
     lcd_wifi_connect_complete();
     lcd_http_info(s_ip_addr);
-    vTaskDelay(8000 / portTICK_RATE_MS);
+    vTaskDelay(5000 / portTICK_RATE_MS);
 #endif
 
     // VERY UNSTABLE without this delay after init'ing wifi... however, much more stable with a new Power Supply
     vTaskDelay(500 / portTICK_RATE_MS);
     ESP_LOGI(TAG, "Free heap: %u", xPortGetFreeHeapSize());
 
-    ESP_LOGD(TAG, "Starting http_server task...");
-    xTaskCreatePinnedToCore(&http_server_task, "http_server_task", 4096, NULL, 5, NULL, 1);
+    ESP_LOGD(TAG, "Starting app_camera_task...");
+    xTaskCreatePinnedToCore(&app_camera_task, "app_camera_task", 4096, NULL, 3, NULL, 1);
 
 #if CONFIG_USE_LCD
     ESP_LOGD(TAG, "Starting app_lcd_task...");
-    xTaskCreate(&app_lcd_task, "app_lcd_task", 4096, NULL, 4, NULL);
+    xTaskCreatePinnedToCore(&app_lcd_task, "app_lcd_task", 4096, NULL, 4, NULL, 0);
 #endif
 
-    ESP_LOGD(TAG, "Starting app_camera_task...");
-    xTaskCreate(&app_camera_task, "app_camera_task", 4096, NULL, 3, NULL);
-
+#if CONFIG_USE_HTTP
+    /* Should run httpserver after WiFi init */
+    xEventGroupWaitBits(wifi_event_group, WIFI_INIT_DONE_BIT, true, false, portMAX_DELAY);
+    ESP_LOGD(TAG, "Starting http_server task...");
+    xTaskCreatePinnedToCore(&http_server_task, "http_server_task", 4096, NULL, 5, NULL, 1);
     ESP_LOGI(TAG, "open http://" IPSTR "/bmp for single image/bitmap image", IP2STR(&s_ip_addr));
     ESP_LOGI(TAG, "open http://" IPSTR "/get for raw image as stored in framebuffer ", IP2STR(&s_ip_addr));
+#endif
 
     ESP_LOGI(TAG, "get free size of 32BIT heap : %d\n", heap_caps_get_free_size(MALLOC_CAP_32BIT));
     ESP_LOGI(TAG, "task stack: %d", uxTaskGetStackHighWaterMark(NULL));
