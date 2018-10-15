@@ -1,4 +1,9 @@
 # ESP32 Camera Demo
+包含分支：
+- tcp 传输示例
+- udp 传输示例
+- arduino 示例，（这里修复了，XCLK 配置为 20MHz 出现花屏的现象）
+
 使用的硬件有：
 - `ESP-WROVER-KIT`开发板
 - OV7670 摄像头
